@@ -41,11 +41,11 @@ Instead of a stack ID, runtime and build-time base images must contain the follo
 - OS (e.g., "linux", `$GOOS`), specified as `os` in the base image `config` 
 - Architecture (e.g., "arm", `$GOARCH`), specified as `architecture` in the base image `config`
 - Architecture Variant (optional) (e.g., "v6", `$GOARM`), specified as `variant` in the base image `config`
-- Distribution (optional) (e.g., "ubuntu", `$ID`), specified as a label `io.buildpacks.distribution.name`
-- Version (optional) (e.g., "18.04", `$VERSION_ID`), specified as a label `io.buildpacks.distribution.version`
+- Distribution (optional) (e.g., "ubuntu", `$ID`), specified as a label `io.buildpacks.base.distro.name`
+- Version (optional) (e.g., "18.04", `$VERSION_ID`), specified as a label `io.buildpacks.base.distro.version`
 
 Additionally, the runtime base may contain the following metadata:
-- Target ID (optional) (e.g., "minimal"), specified as a label `io.buildpacks.id`
+- Target ID (optional) (e.g., "minimal"), specified as a label `io.buildpacks.base.id`
 
 OS, Architecture, and Architecture Variant must be valid identifiers as defined in the [OCI Image specification](https://github.com/opencontainers/image-spec/blob/main/config.md).
 
@@ -53,14 +53,14 @@ Target ID is an identifier specified on the runtime base image that must be prov
 This allows buildpacks to change their behavior if a run image is selected (e.g., distroless) that has special properties outside of OS, architecture, etc.
 
 For Linux-based images, each field should be canonicalized against values specified in `/etc/os-release` (`$ID` and `$VERSION_ID`).
-The `os.version` field in an base image `config` may contain combined distribution and version information, but it is not used by the lifecycle.
+The `os.version` field in a base image `config` may contain combined distribution and version information, but it is not used by the lifecycle.
 
 For Windows-based images, Distribution should be empty. Version should be the [suggested value of `os.version`](https://github.com/opencontainers/image-spec/blob/main/config.md#properties) in the OCI spec (e.g., `10.0.14393.1066`).
 
 The `stacks` list in `buildpack.toml` is replaced by a `targets` list, where each entry corresponds to a different buildpack image that is exported into a [manifest index](https://github.com/opencontainers/image-spec/blob/master/image-index.md).
 Each entry may contain multiple valid values for Distribution and/or Version, but only a single OS, Architecture, and Variant.
-If the `targets` list is empty and `/bin/build` is present, a target with `os = "linux"` and `arch = "x86_64"` is assumed by tools reading `buildpack.toml`.
-If the `targets` list is empty and `/bin/build.bat` or `/bin/build.exe` is present, a target with `os = "windows"` and `arch = "x86_64"` is assumed by tools reading `buildpack.toml`.
+If the `targets` list is empty and `/bin/build` is present, a target with `os = "linux"` and `arch = "amd64"` is assumed by tools reading `buildpack.toml`.
+If the `targets` list is empty and `/bin/build.bat` or `/bin/build.exe` is present, a target with `os = "windows"` and `arch = "amd64"` is assumed by tools reading `buildpack.toml`.
 
 App image builds fail if the build image and selected run image have mismatched metadata. We may introduce flags or additional labels to skip this validation (e.g., for cross-compilation or minimal runtime base images).
 An image without a specified Distribution is compatible with images specifying any Distribution.
@@ -73,25 +73,25 @@ When an app image is rebased, `rebaser` must fail if the new run image and previ
 ```toml
 [[targets]]
 os = "linux"
-arch = "x86_64"
+arch = "amd64"
 [[targets.distributions]]
 name = "ubuntu"
 versions = ["18.04", "20.04"]
 
 [[targets]]
 os = "linux"
-arch = "x86_64"
-[[targets.distributions]]
+arch = "amd64"
+[[targets.distros]]
 name = "ubuntu"
-versions = ["14.04", "16.04"]
+version = "16.04"
 
 [[targets]]
 os = "linux"
 arch = "arm"
 variant = "v6"
-[[targets.distributions]]
+[[targets.distros]]
 name = "ubuntu"
-versions = ["14.04", "16.04"]
+version = "16.04"
 ```
 
 ## Runtime Metadata
@@ -152,12 +152,12 @@ If the newly-specified field values are missing, the lifecycle and pack may used
 
 ```
 config.os = "linux"
-config.architecture = "x86_64"
-io.buildpacks.distribution.name = "ubuntu"
-io.buildpacks.distribution.version = "18.04"
+config.architecture = "amd64"
+io.buildpacks.base.distro.name = "ubuntu"
+io.buildpacks.base.distro.version = "18.04"
 ```
 
-Moving forward it's encouraged for buildpack authors to support both `[[stacks]]` and `[[targets]]` sections in `buildpack.toml` for maximum compatibility. In order to ease this process for those using the `io.buildpacks.stacks.bionic`, lifecycle will translate any section that sets this as on of the `stacks`:
+Moving forward it's encouraged for buildpack authors to support both `[[stacks]]` and `[[targets]]` sections in `buildpack.toml` for maximum compatibility. In order to ease this process for those using the `io.buildpacks.stacks.bionic`, lifecycle will translate any section that sets this as one of the `stacks`:
 
 ```toml
 [[stacks]]
@@ -169,8 +169,8 @@ to
 ```toml
 [[targets]]
 os = "linux"
-arch = "x86_64"
-[[targets.distributions]]
+arch = "amd64"
+[[targets.distros]]
 name = "ubuntu"
 versions = ["18.04"]
 ```
@@ -201,3 +201,32 @@ versions = ["18.04"]
 [spec-changes]: #spec-changes
 
 This RFC requires extensive changes to all specifications.
+
+## Amended
+### Summary
+
+rename x86_64 -> amd64 in keeping with all other usages of arch. descriptors.
+
+### Motivation
+
+This is how we do it everywhere else, this is the way.
+
+## Amended
+### Meta
+[meta-1]: #meta-1
+- Name: Rename Docker labels and `buildpack.toml` table names
+- Start Date: 2024-04-08
+- Author(s): @edmorley
+- Amendment Pull Request: [rfcs#310](https://github.com/buildpacks/rfcs/pull/310)
+
+### Summary
+
+Changes were made to the Docker label and `buildpack.toml` table names between when this RFC was written and the changes were made to the spec in [spec#365](https://github.com/buildpacks/spec/pull/365), which have now been backported to the RFC:
+
+- The `io.buildpacks.distributions.*` Docker labels were renamed to `io.buildpacks.base.distro.*`.
+- The `io.buildpacks.id` Docker label was renamed to `io.buildpacks.base.id`.
+- The `buildpack.toml` table `[[targets.distributions]]` was renamed to `[[targets.distros]]` and the `versions` field within it renamed to `version` (along with its type changing from an array to a string).
+
+### Motivation
+
+To prevent use of the wrong Docker label or `buildpack.toml` table names, if users base their implementations on the RFC rather than reading the spec.
