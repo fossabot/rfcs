@@ -185,7 +185,15 @@ drwxr-xr-x         0:0      32 MB      ├── lifecycle
 [how-it-works]: #how-it-works
 
 Some code that will probably need to change:
-* TODO
+* https://github.com/buildpacks/lifecycle/blob/main/.github/workflows/build.yml - we could templatize this file to build either a vanilla lifecycle or an extender
+* https://github.com/buildpacks/lifecycle/blob/main/.github/workflows/post-release.yml - where we sign and promote the lifecycle image
+* https://github.com/buildpacks/pack/blob/a1edf2e9e3837c2e9eeca019b97c28896b40f778/pkg/client/create_builder.go#L270 would also need to fetch an extender
+* https://github.com/buildpacks/pack/blob/a1edf2e9e3837c2e9eeca019b97c28896b40f778/internal/builder/builder.go#L1029 would also need to embed an extender
+* https://github.com/buildpacks/pack/blob/a1edf2e9e3837c2e9eeca019b97c28896b40f778/pkg/client/build.go#L662 would need to fetch the "lifecycle layer" from the extender image, not the lifecycle image
+  * Currently, we support `pack build --lifecycle-image` to use the non-default one, perhaps we'd need to add `--extender-image` as well
+  * https://github.com/buildpacks/pack/blob/a1edf2e9e3837c2e9eeca019b97c28896b40f778/internal/config/config.go#L152 - where we fall back to buildpacksio/lifecycle if the image is not explicitly provided
+* https://github.com/buildpacks/lifecycle/blob/c895ed40025a70f3de5a197f111c7d27687e1d80/cmd/lifecycle/extender.go#L59 - if we're able to find a drop-in replacement for kaniko it would go here
+* https://github.com/buildpacks/lifecycle/blob/c895ed40025a70f3de5a197f111c7d27687e1d80/phase/extender.go#L264 - the meat of extension logic is in this file; an alternative extender implementation would import or duplicate this logic - see for example https://github.com/buildpacks/pack/pull/1791/files#diff-3f80ad23f1b13e75bf22e1a8aaad7d86d57e41fb823cf6142e3588c67661d556R738
 
 # Migration
 [migration]: #migration
