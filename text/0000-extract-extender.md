@@ -16,9 +16,8 @@ The lifecycle currently uses [kaniko](https://github.com/GoogleContainerTools/ka
 
 We should do this by:
 1. Separating the extender binary from the lifecycle
-2. Delivering the extender separately from the lifecycle (maybe?)
-3. Providing an alternative implementation of the extender that uses a different "dockerfile applier" - e.g., buildah or buildkit 
-4. Removing kaniko-specific references from the platform spec, along with any other spec changes that are needed
+2. Providing an alternative implementation of the extender that uses a different "dockerfile applier" - e.g., buildah or buildkit
+3. Removing kaniko-specific references from the platform spec, along with any other spec changes that are needed
 
 # Definitions
 [definitions]: #definitions
@@ -138,46 +137,17 @@ When extending the build image:
   * We could create [cmd/extender](https://github.com/buildpacks/lifecycle/tree/main/cmd) with its own go.mod
   * This will allow us to upgrade the docker version used by the lifecycle
   * We'll have to update our `make` targets to build both binaries
+  * The extender binary will still be included in the lifecycle tarball and image, but as a separate binary rather than a symlink
+  * Optionally and in the future, we could publish a "slim" version of the lifecycle that excludes the extender binary, for platforms that don't need image extension support
 
-## 2. Delivering the extender separately from the lifecycle (maybe?)
-
-* We could deliver the extender via a separate tarball on the GitHub releases page, and as a separate image at `buildpacksio/extender:<version>`. In both cases, the directory structure would look like the following:
-
-```
-Permission     UID:GID       Size  Filetree                                   
-drwxr-xr-x         0:0      32 MB  └── cnb                                    
-drwxr-xr-x         0:0      32 MB      ├── lifecycle                                     
--rwxrwxrwx         0:0        0 B      │   ├── extender
--rw-r--r--         0:0      10 kB      │   ├── extender.sbom.cdx.json         
--rw-r--r--         0:0      16 kB      │   ├── extender.sbom.spdx.json        
--rw-r--r--         0:0      15 kB      │   ├── extender.sbom.syft.json
--rw-r--r--         0:0      560 B      └── lifecycle.toml
-```
-
-* This should be accompanied in the lifecycle by a minor version bump, due to the breaking change in the delivery mechanism
-* When creating builders, pack could look for a `[lifecycle.extender]` table in [builder.toml](https://buildpacks.io/docs/reference/config/builder-config/#lifecycle-optional) to find the extender binary
-  * If `[lifecycle.extender]` is NOT present, pack could inspect the lifecycle version provided and pull the extender with the same version from the GitHub releases page
-    * This mimics the [behavior](https://github.com/buildpacks/pack/blob/a1edf2e9e3837c2e9eeca019b97c28896b40f778/pkg/client/create_builder.go#L437) when NO lifecycle version is specified (pack will pull the latest lifecycle that it knows about from the GitHub releases page)
-  * Alternatively, we could look for a sibling tarball or image for the lifecycle provided (e.g., if provided `buildpacksio/lifecycle:<version>` we could look for `buildpacksio/extender:<version>`), but this seems risky as it is non-declarative
-  * Alternatively, we could put the lifecycle and the extender in separate layers within the same image
-* pack should put `/cnb/lifecycle/lifecycle` and `/cnb/lifecycle/extender` within the SAME "lifecycle layer" in the builder image
-  * We'd need to be careful not to write the parent directory (`/cnb/lifecycle`) twice, as this can produce an invalid image
-  * From a platform's perspective, nothing about the builder would have really changed, except that the extender is no longer a symlink
-
-* When running builds, platforms would launch extend-build and extend-run containers
-  * Using the builder image (as before) when doing build image extension
-  * Using the run image + extender binary from the _extender_ image (this is different) when doing run image extension
-    * See [here](https://github.com/buildpacks/pack/blob/a1edf2e9e3837c2e9eeca019b97c28896b40f778/pkg/client/build.go#L662) for how this is working today in pack
-    * Other platforms would need to make a similar change in order to upgrade to a newer lifecycle version IF they are looking in the lifecycle image for the extender binary (vs the builder)
-
-## 3. Providing an alternative implementation of the extender
+## 2. Providing an alternative implementation of the extender
 
 * We will need to explore alternatives to kaniko for Dockerfile application.
   * A spike using the Docker Daemon was already completed, see here: https://github.com/buildpacks/pack/pull/1791. We were able to get it working and saw improved performance when extending the build image, but in the end we felt that the additional complexity was too much to support.
     * Note that instead of extending the build image in-container and dropping down to the CNB user to run the build phase, we simply extended the build image and saved it back to the Docker Daemon with a new reference. We then provided the new reference as the builder to use going forward. We could have done something similar when extending the run image (i.e., updated the reference in analyzed.toml).
   * Other alternatives considered are buildah and buildkit.
 
-## 4. Removing kaniko-specific references from the platform spec
+## 3. Removing kaniko-specific references from the platform spec
 
 * Once we have an alternative extender working, we can decide which spec changes (if any) are needed to make it work.
   * We might need to remove the stipulation that we extend the build image in-container and drop down to the CNB user to run the build phase if that is not technically feasible. This was always only an optimization, so we should be okay here.
@@ -203,10 +173,6 @@ Some code that will probably need to change:
 # Migration
 [migration]: #migration
 
-If we move the extender to a new image:
-* Platforms that are performing run image extension must take care to use the run image + extender binary from the _extender_ image (instead of the lifecycle image), as noted above.
-
-If we update the spec:
 * There may be a Platform API version bump for spec changes.
 
 # Drawbacks
@@ -214,18 +180,15 @@ If we update the spec:
 
 Why should we *not* do this?
 * It's more work!
-* If we move the extender to a new image, platforms that are performing run image extension will have to make changes in order to upgrade the lifecycle to the version that uses the new delivery mechanism. This could be surprising. We should take care to socialize this change in advance of its deployment.
+* The lifecycle image will still include the extender binary, which means it will still get flagged by vulnerability scanners until we implement an alternative to kaniko.
 
 # Alternatives
 [alternatives]: #alternatives
 
 - What other designs have been considered?
-  - We thought about NOT moving the extender binary to a new image, but this would
-    - Probably increase the size of the lifecycle image (currently about 30 MB)
-    - Not solve the problem of the lifecycle image getting flagged by vulnerability scanners (at least for the period of time when we are relying on the old kaniko implementation)
-      - Though, if we're still packing the extender into builders, builders are still going to get flagged
-      - Delivering the new extender binary as a separate tarball & image would make it easier for platforms that don't support extensions to exclude the extender binary from builders, but that is beyond the scope of this RFC
-    - Keeping the extender in the lifecycle image (as a separate binary, not a symlink) would be quick and easy to deliver, and would require no changes from platforms, so we should consider it
+  - We thought about moving the extender binary to a new image, but this would
+    - Require significant changes from platforms that are performing run image extension
+    - Though the lifecycle image might no longer get flagged by vulnerability scanners, if we're still packing the extender into builders, builders are still going to get flagged
   - We could fork kaniko and continue to use it as the dockerfile applier. Maybe it wouldn't be too hard to maintain, especially if we rip out the parts that we're not using
 - Why is this proposal the best? Maybe it's not the best, I don't know! Let's discuss
 - What is the impact of not doing this? Risk of the lifecycle becoming outdated & insecure
