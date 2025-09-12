@@ -456,6 +456,8 @@ No breaking changes are introduced - existing rebase operations will continue to
 - **Increased complexity**: Additional metadata and validation logic increases implementation complexity
 - **Performance overhead**: Layer analysis and validation may add time to rebase operations
 - **Compatibility constraints**: Some base image updates may become impossible due to strict compatibility requirements
+- **Single Layer**: This is intended to be a 1 to 1 layer replacement. You can't turn 1 layer into many layers or define a hard relationship between layers such that 2 layers get replaced in a single patch selector.
+- **Packages**: This does not address being able to patch a vuln on a single `npm` package in a layer that `node_modules`.
 
 # Alternatives
 [alternatives]: #alternatives
@@ -481,7 +483,7 @@ No breaking changes are introduced - existing rebase operations will continue to
 
 # Unresolved Questions
 [unresolved-questions]: #unresolved-questions
-
+- **Sparse Images**: This is not directly related to this RFC, but `pack` can produce sparse images. `pack` doesn't appear to be able to `pack rebase --sparse`. We should consider closing this gap and understanding how this feature would intersect with sparse images.
 
 # Spec. Changes (OPTIONAL)
 [spec-changes]: #spec-changes
