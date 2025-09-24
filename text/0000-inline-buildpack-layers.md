@@ -57,6 +57,10 @@ echo "hello" > $1/hello/hello.txt
 """
 ```
 
+The actual implementation could create the layer either:
+1. By inserting a script into the generated buildpack, wrapping the inline script, and generating the layer dir. This is challenging because we don't know what shell will be available.
+2. Creating a new mechanism in the lifecycle that allows the buildpack to "declare" a layer, and have the lifecycle create the dir.
+
 # Migration
 [migration]: #migration
 
@@ -84,6 +88,7 @@ This change is backward compatible.
 
 - What should the default launch, build, and cache values be for an inline layer
 - Should we just create a default layer that can be used without _any_ setup?
+- How do we actually implement this? We can either dump a script in the inline buildpack, or create a lifecycle level operation.
 
 # Spec. Changes (OPTIONAL)
 [spec-changes]: #spec-changes
