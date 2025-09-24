@@ -72,6 +72,7 @@ This change is backward compatible.
 [alternatives]: #alternatives
 
 - Provide helper scripts to the inline buildpack to make common operations easier
+- Create a default layer that can be used without any config
 
 # Prior Art
 [prior-art]: #prior-art
@@ -82,6 +83,7 @@ This change is backward compatible.
 [unresolved-questions]: #unresolved-questions
 
 - What should the default launch, build, and cache values be for an inline layer
+- Should we just create a default layer that can be used without _any_ setup?
 
 # Spec. Changes (OPTIONAL)
 [spec-changes]: #spec-changes
