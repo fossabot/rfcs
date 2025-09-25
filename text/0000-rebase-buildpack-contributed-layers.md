@@ -428,6 +428,7 @@ No breaking changes are introduced - existing rebase operations will continue to
 # Unresolved Questions
 [unresolved-questions]: #unresolved-questions
 - **Sparse Images**: This is not directly related to this RFC, but `pack` can produce sparse images. `pack` doesn't appear to be able to `pack rebase --sparse`. We should consider closing this gap and understanding how this feature would intersect with sparse images.
+- **Patch Distribution**: This RFC hasn't defined how the patch file(s) and images are expected to be distributed. We need a path that makes sense for Platform Operators as well as end users who only interact with `pack`.
 
 # Spec. Changes (OPTIONAL)
 [spec-changes]: #spec-changes
