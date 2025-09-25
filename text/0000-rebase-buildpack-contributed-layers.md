@@ -17,7 +17,7 @@ Enable rebase to accept an optional metadata file describing buildpack-contribut
 # Definitions
 [definitions]: #definitions
 
-**Buildpack-contributed layers** - Filesystem layers created by buildpacks during the build process, containing application dependencies, runtime components, or other buildpack-specific artifacts.
+**Buildpack-contributed layers** - Filesystem layers created by buildpacks during the build process, containing application dependencies, component libraries, or other buildpack-specific artifacts.
 
 **Layer patch metadata** - A configuration file that describes which layers in the target image should be replaced with corresponding layers from a patch OCI image.
 
@@ -28,7 +28,7 @@ Enable rebase to accept an optional metadata file describing buildpack-contribut
 # Motivation
 [motivation]: #motivation
 
-- **Selective patching**: Enable updating specific components (e.g., Node.js 24.7.* → 24.7.2) without full rebuilds
+- **Selective patching**: Enable updating specific components (e.g., component 1.2.* → 1.2.3) without full rebuilds
 - **Security vulnerability fixes**: Quickly patch vulnerable dependencies in buildpack layers without rebuilding entire applications
 - **Dependency updates**: Allow targeted updates of specific buildpack-contributed components while preserving other layers
 - **Operational efficiency**: Reduce the scope of changes during updates, minimizing risk and deployment time
@@ -53,22 +53,22 @@ This feature extends the rebase command to accept an optional metadata file that
 
 **Example workflow**:
 ```bash
-# Original image with Node.js 24.7.0 buildpack layer
-pack build myapp --builder heroku/builder:24
+# Original image with component 1.2.0 buildpack layer
+pack build myapp --builder example/builder:24
 
-# Create patch metadata file to update Node.js from any 24.7.x to 24.7.2
+# Create patch metadata file to update component from any 1.2.x to 1.2.3
 cat > layer-patches.json << EOF
 {
   "patches": [
     {
-      "buildpack": "heroku/nodejs",
+      "buildpack": "example/buildpack",
       "layer": "dist",
       "data": {
-        "artifact.version": "24.7.*"
+        "artifact.version": "1.2.*"
       },
-      "patch-image": "registry.example.com/patches/nodejs:24.7.2",
+      "patch-image": "registry.example.com/patches/component:1.2.3",
       "patch-image.mirrors": [
-        "backup-registry.example.com/patches/nodejs:24.7.2"
+        "backup-registry.example.com/patches/component:1.2.3"
       ]
     }
   ]
@@ -107,15 +107,15 @@ The layer patches metadata file uses JSON format and references the `io.buildpac
 {
   "patches": [
     {
-      "buildpack": "heroku/nodejs",
+      "buildpack": "example/buildpack",
       "layer": "dist",
       "data": {
-        "artifact.version": "24.7.*"
+        "artifact.version": "1.2.*"
       },
-      "patch-image": "registry.example.com/patches/nodejs:24.7.2",
+      "patch-image": "registry.example.com/patches/component:1.2.3",
       "patch-image.mirrors": [
-        "backup-registry.example.com/patches/nodejs:24.7.2",
-        "public.ecr.aws/example/patches/nodejs:24.7.2"
+        "backup-registry.example.com/patches/component:1.2.3",
+        "public.ecr.aws/example/patches/component:1.2.3"
       ]
     }
   ]
@@ -124,18 +124,18 @@ The layer patches metadata file uses JSON format and references the `io.buildpac
 
 ### Matching Logic
 The matching operates on the `buildpacks` array within `io.buildpacks.lifecycle.metadata`:
-- **buildpack**: Matches `buildpacks[].key` (e.g., "heroku/nodejs")
+- **buildpack**: Matches `buildpacks[].key` (e.g., "example/buildpack")
 - **layer**: Matches keys in `buildpacks[].layers` (e.g., "dist")
 - **data**: Generic object for matching any nested structure within `buildpacks[].layers[layer].data`
   - Uses dot notation for nested paths: `"artifact.version"` matches `data.artifact.version`
   - Supports any buildpack-specific data structure
-- **Pattern matching**: Support glob patterns like "24.7.*" for version ranges (matches 24.7.0, 24.7.1, 24.7.2, etc.)
+- **Pattern matching**: Support glob patterns like "1.2.*" for version ranges (matches 1.2.0, 1.2.1, 1.2.3, etc.)
 - **Multiple criteria**: All specified criteria must match for a layer to be selected
 
 ### Patch Layer Selection
 - Uses the same `buildpack` and `layer` values to locate the replacement layer in the patch image
 - Validates that the patch layer exists and has compatible metadata structure
-- Assumes patch and target layers represent the same logical component (e.g., both are "dist" layers from "heroku/nodejs")
+- Assumes patch and target layers represent the same logical component (e.g., both are "dist" layers from "example/buildpack")
 
 ### Registry Fallback Support
 - **patch-image.mirrors**: Optional array of mirror registries for the patch image, similar to `runImage.mirrors` in the CNB specification
@@ -160,34 +160,34 @@ The matching operates on the `buildpacks` array within `io.buildpacks.lifecycle.
 
 **Example patch image creation**:
 ```bash
-# Create a minimal Node.js app to generate updated layer
-echo '{"name": "patch-app", "version": "1.0.0"}' > package.json
+# Create a minimal app to generate updated layer
+echo 'minimal app content' > app.txt
 
 # Build with updated buildpack to create patch image
-pack build registry.platform.com/security-patches/nodejs:24.7.2 \
-  --builder heroku/builder:24 \
-  --buildpack registry.platform.com/buildpacks/nodejs:5.0.5-security-patch
+pack build registry.platform.com/security-patches/component:1.2.3 \
+  --builder example/builder:24 \
+  --buildpack registry.platform.com/buildpacks/example:2.1.0-security-patch
 
 # Push patch image to registry
-docker push registry.platform.com/security-patches/nodejs:24.7.2
+docker push registry.platform.com/security-patches/component:1.2.3
 ```
 
 ### Real-world Examples
 
-**Node.js Buildpack** with nested artifact structure:
+**Example Buildpack** with nested artifact structure:
 ```json
 {
   "buildpacks": [
     {
-      "key": "heroku/nodejs",
+      "key": "example/buildpack",
       "version": "5.0.1",
       "layers": {
         "dist": {
           "sha": "sha256:07a4155470875608306f01f6a4045aaff4f6f9abaa6cb9f96a9ef6b8bdb440a6",
           "data": {
             "artifact": {
-              "version": "24.7.0",
-              "url": "https://nodejs.org/download/release/v24.7.0/node-v24.7.0-linux-arm64.tar.gz"
+              "version": "1.2.0",
+              "url": "https://example.com/download/release/v1.2.0/component-v1.2.0-linux-arm64.tar.gz"
             }
           }
         }
@@ -199,10 +199,10 @@ docker push registry.platform.com/security-patches/nodejs:24.7.2
 Patch configuration:
 ```json
 {
-  "buildpack": "heroku/nodejs",
+  "buildpack": "example/buildpack",
   "layer": "dist",
-  "data": {"artifact.version": "24.7.*"},
-  "patch-image": "registry.example.com/patches/nodejs:24.7.2"
+  "data": {"artifact.version": "1.2.*"},
+  "patch-image": "registry.example.com/patches/component:1.2.3"
 }
 ```
 
@@ -279,82 +279,26 @@ The generic `data` matching system allows any buildpack to use their own metadat
 
 ### Platform-Scale Example
 
-A platform operator managing applications with multiple language runtimes can patch all vulnerable components in a single operation. Consider a platform hosting Ruby, Node.js, nginx, custom routing, and Java applications:
+A platform operator managing applications with multiple components can patch all vulnerable components in a single operation.
 
 ```json
 {
   "patches": [
     {
-      "buildpack": "heroku/ruby",
-      "layer": "ruby",
-      "data": {
-        "version": "3.1.*"
-      },
-      "patch-image": "registry.platform.com/security-patches/ruby:3.1.4"
-    },
-    {
-      "buildpack": "heroku/ruby",
-      "layer": "bundler",
+      "buildpack": "example/other-buildpack",
+      "layer": "custom-component",
       "data": {
         "version": "2.4.*"
       },
-      "patch-image": "registry.platform.com/security-patches/bundler:2.4.21"
+      "patch-image": "registry.platform.com/security-patches/custom-component:2.4.21"
     },
     {
-      "buildpack": "heroku/nodejs",
+      "buildpack": "example/buildpack",
       "layer": "dist",
       "data": {
         "artifact.version": "18.18.*"
       },
-      "patch-image": "registry.platform.com/security-patches/nodejs:18.18.2"
-    },
-    {
-      "buildpack": "heroku/nodejs",
-      "layer": "dist",
-      "data": {
-        "artifact.version": "20.9.*"
-      },
-      "patch-image": "registry.platform.com/security-patches/nodejs:20.9.1"
-    },
-    {
-      "buildpack": "example/nginx",
-      "layer": "binary",
-      "data": {
-        "version": "1.24.*"
-      },
-      "patch-image": "registry.platform.com/security-patches/nginx:1.24.1"
-    },
-    {
-      "buildpack": "platform/mcp-router",
-      "layer": "router-binary",
-      "data": {
-        "build_date": "2024-01-*"
-      },
-      "patch-image": "registry.platform.com/security-patches/mcp-router:2024-02-15"
-    },
-    {
-      "buildpack": "example/java",
-      "layer": "jdk",
-      "data": {
-        "runtime.java_version": "17.0.*"
-      },
-      "patch-image": "registry.platform.com/security-patches/openjdk:17.0.10"
-    },
-    {
-      "buildpack": "example/java",
-      "layer": "jdk",
-      "data": {
-        "runtime.java_version": "21.0.*"
-      },
-      "patch-image": "registry.platform.com/security-patches/openjdk:21.0.2"
-    },
-    {
-      "buildpack": "example/java",
-      "layer": "maven",
-      "data": {
-        "version": "3.9.*"
-      },
-      "patch-image": "registry.platform.com/security-patches/maven:3.9.6"
+      "patch-image": "registry.platform.com/security-patches/component:18.18.2"
     }
   ]
 }
@@ -363,7 +307,7 @@ A platform operator managing applications with multiple language runtimes can pa
 **Operational Benefits:**
 - **Single command**: `pack rebase --layer-patches security-patches.json` (or `CNB_LAYER_PATCHES_FILE=security-patches.json pack rebase`) patches all affected applications
 - **Selective targeting**: Only applications with vulnerable versions are updated
-- **Multiple languages**: Handles diverse runtime environments in one operation
+- **Multiple targets**: Handles diverse component in one operation
 - **Version flexibility**: Pattern matching accommodates different patch levels across applications
 - **Centralized patches**: All security fixes come from a controlled registry
 
@@ -389,21 +333,21 @@ This approach allows platform operators to respond quickly to security advisorie
 - **Data preservation**: Layer data structures from the patch image replace the original layer data to maintain accuracy
 - **Metadata validation**: The system validates that copied metadata is structurally compatible with the existing metadata schema
 
-Example metadata update for a Node.js patch:
+Example metadata update for a component patch:
 ```json
 // Before patch (from target image)
 {
   "buildpacks": [
     {
-      "key": "heroku/nodejs",
+      "key": "example/buildpack",
       "version": "5.0.1",
       "layers": {
         "dist": {
           "sha": "sha256:07a4155470875608306f01f6a4045aaff4f6f9abaa6cb9f96a9ef6b8bdb440a6",
           "data": {
             "artifact": {
-              "version": "24.7.0",
-              "url": "https://nodejs.org/download/release/v24.7.0/node-v24.7.0-linux-arm64.tar.gz"
+              "version": "1.2.0",
+              "url": "https://example.com/download/release/v1.2.0/component-v1.2.0-linux-arm64.tar.gz"
             }
           }
         }
@@ -416,15 +360,15 @@ Example metadata update for a Node.js patch:
 {
   "buildpacks": [
     {
-      "key": "heroku/nodejs",
+      "key": "example/buildpack",
       "version": "5.0.1",
       "layers": {
         "dist": {
           "sha": "sha256:1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567890",
           "data": {
             "artifact": {
-              "version": "24.7.2",
-              "url": "https://nodejs.org/download/release/v24.7.2/node-v24.7.2-linux-arm64.tar.gz"
+              "version": "1.2.3",
+              "url": "https://example.com/download/release/v1.2.3/component-v1.2.3-linux-arm64.tar.gz"
             }
           }
         }
