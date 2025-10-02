@@ -77,6 +77,7 @@ This change is backward compatible.
 
 - Provide helper scripts to the inline buildpack to make common operations easier
 - Create a default layer that can be used without any config
+- Add `slices` to `buildpack.toml`, and surface that key in the inline buildpack definition
 
 # Prior Art
 [prior-art]: #prior-art
