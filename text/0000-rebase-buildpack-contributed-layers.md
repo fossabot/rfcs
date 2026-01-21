@@ -12,7 +12,7 @@
 # Summary
 [summary]: #summary
 
-Enable rebase to accept an optional metadata file describing buildpack-contributed layers that should be selectively patched from an OCI image during the rebase operation.
+Enable rebase to accept an optional metadata file describing buildpack-contributed layers that should be selectively patched from an OCI image during the rebase operation. This feature will be gated behind experimental flags until a future date.
 
 # Definitions
 [definitions]: #definitions
@@ -384,6 +384,23 @@ Example metadata update for a component patch:
 - **Missing architecture handling**: If no matching OS/arch variant exists in the `patch-image`, the patch is skipped with a warning
 - **Image access failures**: If the entire `patch-image` cannot be found or accessed, the operation fails immediately
 
+### Buildpack Patch Distribution
+The generation and distribution of the patch file is out of scope for this RFC but because this feature will being as experimental we are documenting a possible path for community drive patches.
+
+A buildpack author has a buildpack distributed as `ossuser/my-tini-buildpack`, we could consider allowing the user to define an upstream patch reference in `buildpack.toml` targets. A platform such as `pack` could find the relevant `buildpack.toml` files for the selected buildpacks and then merge the resulting patch files into for layer patching. This allows buildpacks from different ecosystems to be patched by the platform without them all needing to be in a shared builder.
+
+```toml
+[buildpack]
+id = "ossuser/my-tini-buildpack"
+version = "1.0"
+
+# Targets the buildpack will work with
+[[targets]]
+os = "linux"
+[layer-patch]
+reference_uri = "github.com/ossuer-buildpack/releases/tini-patch.json"
+```
+
 # Migration
 [migration]: #migration
 
@@ -423,7 +440,6 @@ No breaking changes are introduced - existing rebase operations will continue to
 
 # Prior Art
 [prior-art]: #prior-art
-
 
 # Unresolved Questions
 [unresolved-questions]: #unresolved-questions
